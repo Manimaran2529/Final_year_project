@@ -3,6 +3,8 @@ import random
 import whisper
 import os
 from google import genai
+from models import HRResult
+from database import SessionLocal
 
 router = APIRouter()
 
@@ -88,3 +90,19 @@ async def evaluate_hr(video: UploadFile = File(...)):
         "transcript": transcript,
         "analysis": response.text
     }
+
+@router.post("/save-hr")
+def save_hr(data: dict):
+
+    db = SessionLocal()
+
+    new_result = HRResult(
+        user_id=data["user_id"],
+        answers_submitted=data["answers_submitted"]
+    )
+
+    db.add(new_result)
+    db.commit()
+    db.close()
+
+    return {"message": "HR result saved"}

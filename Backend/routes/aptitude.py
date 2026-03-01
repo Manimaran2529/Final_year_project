@@ -1,17 +1,38 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from database import SessionLocal
 from services.aptitude_ai import generate_aptitude_questions
+from models import AptitudeResult   # ✅ FIXED IMPORT
 
 router = APIRouter()
+
+# ===============================
+# Request Models
+# ===============================
 
 class GenerateRequest(BaseModel):
     category: str
     count: int
     difficulty: str
 
+
 class SubmitRequest(BaseModel):
     questions: list
     user_answers: list
+    user_id: int   # ✅ add user_id here for saving
+
+
+# ===============================
+# DB Dependency
+# ===============================
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 # ===============================
@@ -31,11 +52,11 @@ def generate_questions(data: GenerateRequest):
 
 
 # ===============================
-# Submit & Evaluate
+# Submit, Evaluate & Save
 # ===============================
 
 @router.post("/aptitude/submit")
-def submit_answers(data: SubmitRequest):
+def submit_answers(data: SubmitRequest, db: Session = Depends(get_db)):
 
     score = 0
     results = []
@@ -58,28 +79,18 @@ def submit_answers(data: SubmitRequest):
             "is_correct": is_correct
         })
 
+    # ✅ Save result to database
+    new_result = AptitudeResult(
+        user_id=data.user_id,
+        total_questions=len(data.questions),
+        correct_answers=score
+    )
+
+    db.add(new_result)
+    db.commit()
+
     return {
         "total": len(data.questions),
         "score": score,
         "results": results
     }
-
-from Backend.routes import AptitudeResult
-from database import SessionLocal
-
-@router.post("/save-aptitude")
-def save_aptitude(data: dict):
-
-    db = SessionLocal()
-
-    new_result = AptitudeResult(
-        user_id=data["user_id"],
-        total_questions=data["total_questions"],
-        correct_answers=data["correct_answers"]
-    )
-
-    db.add(new_result)
-    db.commit()
-    db.close()
-
-    return {"message": "Saved"}

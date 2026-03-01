@@ -16,7 +16,7 @@ import UrlChecker from "./pages/UrlChecker";
 import OfferChecker from "./pages/OfferChecker";
 import CertificateChecker from "./pages/CertificateChecker";
 
-import Login from "./pages/login"; // ✅ fixed case
+import Login from "./pages/login";
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("token");
@@ -34,10 +34,11 @@ export default function App() {
   return (
     <Routes>
 
-      {/* Public Route */}
+      {/* PUBLIC ROUTES */}
       <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />  {/* ✅ MOVED HERE */}
 
-      {/* Root Redirect */}
+      {/* ROOT REDIRECT */}
       <Route
         path="/"
         element={
@@ -47,7 +48,7 @@ export default function App() {
         }
       />
 
-      {/* Protected Layout */}
+      {/* PROTECTED ROUTES */}
       <Route
         element={
           <ProtectedRoute>
@@ -59,7 +60,6 @@ export default function App() {
         <Route path="/analyze-job" element={<AnalyzeJob />} />
         <Route path="/interview-prep" element={<InterviewPrep />} />
         <Route path="/hr-reply" element={<HRReply />} />
-        <Route path="/register" element={<Register />} />
 
         <Route path="/interview-prep/aptitude" element={<Aptitude />} />
         <Route path="/interview-prep/coding" element={<Coding />} />
@@ -76,3 +76,4 @@ export default function App() {
     </Routes>
   );
 }
+

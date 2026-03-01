@@ -50,28 +50,25 @@ export default function Coding() {
   };
 
   // ================= SUBMIT CODE =================
-  const submitCode = async () => {
+ const submitCode = async () => {
+  try {
+    const res = await axios.post(
+      "http://127.0.0.1:8000/ai-evaluate-code",
+      {
+        code: userCode,                      // ✅ correct field name
+        language: language,
+        correct_solution: question.correct_solution
+      }
+    );
 
-    try {
-      const res = await axios.post(
-        "http://127.0.0.1:8000/ai-evaluate-code",
-        {
-          question: question.problem_statement,
-          expected_logic: question.problem_statement,
-          user_code: userCode,
-          language: language,
-          correct_solution: question.correct_solution
-        }
-      );
+    setResult(res.data);
+    setFinished(true);
 
-      setResult(res.data);
-      setFinished(true);
-
-    } catch (err) {
-      alert("Evaluation failed");
-      console.error(err);
-    }
-  };
+  } catch (err) {
+    alert("Evaluation failed");
+    console.error(err);
+  }
+};
 
   // ================= START SCREEN =================
   if (!started) {
