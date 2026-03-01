@@ -6,57 +6,77 @@ from google import genai
 
 router = APIRouter()
 
-# ================= HR QUESTIONS =================
+# ===============================
+# AI HR QUESTION GENERATOR
+# ===============================
 
-hr_questions = [
-    "Tell me about yourself.",
-    "Why should we hire you?",
-    "What are your strengths and weaknesses?",
-    "Where do you see yourself in 5 years?",
-    "What are your short-term and long-term goals?",
-    "Why do you want to work in our company?",
-    "Describe a challenging situation and how you handled it.",
-    "What is your expected salary?"
-]
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 @router.get("/hr-question")
 def get_hr_question():
-    return {"question": random.choice(hr_questions)}
 
-# ================= WHISPER MODEL =================
+    prompt = """
+    Generate 1 professional HR interview question.
+    Do not repeat common questions.
+    Make it realistic and corporate.
+    Return only the question.
+    """
+
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt
+    )
+
+    return {"question": response.text.strip()}
+
+
+# ===============================
+# LOAD WHISPER MODEL
+# ===============================
 
 model = whisper.load_model("base")
 
-# ================= GEMINI =================
 
-client = genai.Client(api_key="AIzaSyC24p6QT9xng_6HjALRn62lb5g8o5kJo9I")
-
-# ================= EVALUATION =================
+# ===============================
+# HR VIDEO EVALUATION
+# ===============================
 
 @router.post("/hr-evaluate")
-async def evaluate_hr(audio: UploadFile = File(...)):
+async def evaluate_hr(video: UploadFile = File(...)):
 
     folder = "recordings"
     os.makedirs(folder, exist_ok=True)
 
-    file_location = f"{folder}/{audio.filename}"
+    file_path = f"{folder}/{video.filename}"
 
-    with open(file_location, "wb") as f:
-        f.write(await audio.read())
+    # Save uploaded video
+    with open(file_path, "wb") as f:
+        f.write(await video.read())
 
-    result = model.transcribe(file_location)
+    # Transcribe using Whisper
+    result = model.transcribe(file_path)
     transcript = result["text"]
 
+    # AI Evaluation Prompt
     prompt = f"""
-    Evaluate this HR interview answer:
+    You are an HR interviewer.
+
+    Evaluate this candidate answer:
 
     "{transcript}"
 
-    Give:
-    - Score out of 10
-    - Strengths
-    - Improvements
-    - Confidence level
+    Give structured JSON response in this format:
+
+    {{
+      "score": number (0-10),
+      "confidence_level": percentage,
+      "strengths": "text",
+      "weaknesses": "text",
+      "communication": "text",
+      "improvements": "text"
+    }}
+
+    Return only valid JSON.
     """
 
     response = client.models.generate_content(
@@ -66,5 +86,5 @@ async def evaluate_hr(audio: UploadFile = File(...)):
 
     return {
         "transcript": transcript,
-        "feedback": response.text
+        "analysis": response.text
     }

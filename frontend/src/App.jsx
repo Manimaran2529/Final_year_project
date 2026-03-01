@@ -64,7 +64,7 @@ export default function App() {
         <Route path="/interview-prep/aptitude" element={<Aptitude />} />
         <Route path="/interview-prep/coding" element={<Coding />} />
         <Route path="/interview-prep/hr" element={<HRRound />} />
-        <Route path="/interview-prep/progress" element={<Progress />} />
+        <Route path="/progress" element={<Progress />} />
         <Route path="/interview-prep/technical" element={<TechnicalRound />} />
 
         <Route path="/gmail-checker" element={<GmailChecker />} />

@@ -7,114 +7,103 @@ import {
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  RadialBarChart,
+  RadialBar
 } from "recharts";
 
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
+import axios from "axios";
 
 export default function Dashboard() {
 
+  const [data, setData] = useState(null);
+
+  const userId = localStorage.getItem("user_id");
   const userName = localStorage.getItem("user_name");
-  const userEmail = localStorage.getItem("user_email");
 
-  const stats = [
-    { label: "Jobs Analyzed", value: 12 },
-    { label: "Fake Jobs", value: 3 },
-    { label: "Interviews", value: 8 },
-    { label: "Accuracy", value: "92%" },
-  ];
+  useEffect(() => {
+    if (!userId) return;
 
-  const lineData = [
-    { name: "Mon", jobs: 2 },
-    { name: "Tue", jobs: 3 },
-    { name: "Wed", jobs: 4 },
-    { name: "Thu", jobs: 1 },
-    { name: "Fri", jobs: 2 },
-    { name: "Sat", jobs: 0 },
-    { name: "Sun", jobs: 3 },
-  ];
+    axios
+      .get(`http://localhost:8000/dashboard-summary/${userId}`)
+      .then((res) => setData(res.data))
+      .catch((err) => console.error(err));
+
+  }, [userId]);
+
+  if (!data) {
+    return (
+      <div className="text-white p-10">
+        Loading dashboard...
+      </div>
+    );
+  }
 
   const pieData = [
-    { name: "Real", value: 9 },
-    { name: "Fake", value: 3 },
+    { name: "Real", value: data.total_jobs - data.fake_jobs },
+    { name: "Fake", value: data.fake_jobs },
+  ];
+
+  const radialData = [
+    {
+      name: "Readiness",
+      value: data.readiness,
+      fill: "#3b82f6",
+    },
   ];
 
   const COLORS = ["#3b82f6", "#ef4444"];
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-12">
 
-      {/* Welcome Banner */}
       <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="bg-gradient-to-r from-blue-600/20 to-purple-600/20 p-8 rounded-3xl border border-white/10 backdrop-blur-xl"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="bg-gradient-to-r from-blue-600/20 to-purple-600/20 p-8 rounded-3xl border border-white/10"
       >
-        <h1 className="text-3xl font-bold mb-2">
-          Welcome back, {userName || userEmail} 👋
+        <h1 className="text-3xl font-bold">
+          Welcome back, {userName} 👋
         </h1>
         <p className="text-gray-400">
-          Here’s your job trust performance overview for this week.
+          Live performance overview
         </p>
       </motion.div>
 
-      {/* Stats Grid */}
+      {/* Stats */}
       <div className="grid md:grid-cols-4 gap-8">
 
-        {stats.map((item, index) => (
-          <motion.div
-            key={index}
-            whileHover={{ scale: 1.05 }}
-            className="p-8 rounded-3xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-lg"
-          >
-            <p className="text-gray-400 text-sm">{item.label}</p>
-            <h2 className="text-4xl font-bold mt-4 text-white">
-              {item.value}
-            </h2>
-          </motion.div>
-        ))}
+        <div className="p-8 rounded-3xl bg-white/5 border border-white/10">
+          <p className="text-gray-400 text-sm">Jobs Analyzed</p>
+          <h2 className="text-4xl font-bold">{data.total_jobs}</h2>
+        </div>
+
+        <div className="p-8 rounded-3xl bg-white/5 border border-white/10">
+          <p className="text-gray-400 text-sm">Fake Jobs</p>
+          <h2 className="text-4xl font-bold">{data.fake_jobs}</h2>
+        </div>
+
+        <div className="p-8 rounded-3xl bg-white/5 border border-white/10">
+          <p className="text-gray-400 text-sm">Interviews</p>
+          <h2 className="text-4xl font-bold">{data.interviews}</h2>
+        </div>
+
+        <div className="p-8 rounded-3xl bg-white/5 border border-white/10">
+          <p className="text-gray-400 text-sm">Accuracy</p>
+          <h2 className="text-4xl font-bold text-green-400">
+            {data.accuracy}%
+          </h2>
+        </div>
 
       </div>
 
-      {/* Charts Section */}
+      {/* Charts */}
       <div className="grid md:grid-cols-2 gap-12">
 
-        {/* Line Chart Card */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="bg-white/5 backdrop-blur-xl p-8 rounded-3xl border border-white/10 shadow-xl"
-        >
-          <h3 className="text-xl font-semibold mb-6">
-            Weekly Job Activity
-          </h3>
-
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={lineData}>
-              <XAxis dataKey="name" stroke="#aaa" />
-              <YAxis stroke="#aaa" />
-              <Tooltip />
-              <Line
-                type="monotone"
-                dataKey="jobs"
-                stroke="#3b82f6"
-                strokeWidth={3}
-                dot={{ r: 6 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </motion.div>
-
-        {/* Pie Chart Card */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
-          className="bg-white/5 backdrop-blur-xl p-8 rounded-3xl border border-white/10 shadow-xl"
-        >
-          <h3 className="text-xl font-semibold mb-6 text-center">
+        <div className="bg-white/5 p-8 rounded-3xl border border-white/10">
+          <h3 className="text-xl mb-6 text-center">
             Fake vs Real Jobs
           </h3>
 
@@ -133,7 +122,33 @@ export default function Dashboard() {
               <Tooltip />
             </PieChart>
           </ResponsiveContainer>
-        </motion.div>
+        </div>
+
+        <div className="bg-white/5 p-8 rounded-3xl border border-white/10 text-center">
+          <h3 className="text-xl mb-6">
+            Interview Readiness
+          </h3>
+
+          <ResponsiveContainer width="100%" height={300}>
+            <RadialBarChart
+              innerRadius="70%"
+              outerRadius="100%"
+              data={radialData}
+              startAngle={180}
+              endAngle={0}
+            >
+              <RadialBar
+                background
+                clockWise
+                dataKey="value"
+              />
+            </RadialBarChart>
+          </ResponsiveContainer>
+
+          <p className="text-2xl font-bold mt-4">
+            {data.readiness}%
+          </p>
+        </div>
 
       </div>
 

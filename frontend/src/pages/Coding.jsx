@@ -1,303 +1,277 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 
 export default function Coding() {
-  const [difficulty, setDifficulty] = useState("easy");
-  const [count, setCount] = useState(1);
-  const [language, setLanguage] = useState("python");
 
-  const [questions, setQuestions] = useState([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [language, setLanguage] = useState("python");
+  const [difficulty, setDifficulty] = useState("easy");
+  const [question, setQuestion] = useState(null);
   const [userCode, setUserCode] = useState("");
-  const [score, setScore] = useState(0);
+  const [result, setResult] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(180);
+  const [started, setStarted] = useState(false);
   const [finished, setFinished] = useState(false);
 
-  const [result, setResult] = useState(null);
-  const [customInput, setCustomInput] = useState("");
+  // ================= TIMER =================
+  useEffect(() => {
+    if (!started || finished) return;
 
-  // ---------------------------------
-  // Fetch Questions
-  // ---------------------------------
-  const fetchQuestions = async () => {
+    if (timeLeft <= 0) {
+      alert("⏱ Time's up!");
+      submitCode();
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setTimeLeft(prev => prev - 1);
+    }, 1000);
+
+    return () => clearInterval(timer);
+
+  }, [timeLeft, started, finished]);
+
+  // ================= FETCH QUESTION =================
+  const fetchQuestion = async () => {
     try {
       const res = await axios.get(
-        `http://127.0.0.1:8000/coding-questions/${difficulty}/${count}`
+        `http://127.0.0.1:8000/ai-coding-question/${language}/${difficulty}`
       );
 
-      setQuestions(res.data.questions);
-      setCurrentIndex(0);
-      setScore(0);
-      setFinished(false);
+      setQuestion(res.data);
+      setUserCode("");
       setResult(null);
+      setTimeLeft(180);
+      setStarted(true);
 
-      if (res.data.questions.length > 0) {
-        const firstQuestion = res.data.questions[0];
-
-        setUserCode(
-          language === "python"
-            ? firstQuestion.python_starter
-            : firstQuestion.java_starter
-        );
-      }
     } catch (err) {
+      alert("Error loading question");
       console.error(err);
     }
   };
 
-  // ---------------------------------
-  // Submit Code (NO AUTO NEXT)
-  // ---------------------------------
+  // ================= SUBMIT CODE =================
   const submitCode = async () => {
-    const currentQuestion = questions[currentIndex];
 
     try {
       const res = await axios.post(
-        "http://127.0.0.1:8000/submit-code",
+        "http://127.0.0.1:8000/ai-evaluate-code",
         {
-          code: userCode,
-          question_id: currentQuestion.id,
-          custom_input: customInput,
+          question: question.problem_statement,
+          expected_logic: question.problem_statement,
+          user_code: userCode,
           language: language,
+          correct_solution: question.correct_solution
         }
       );
 
       setResult(res.data);
-
-      if (res.data.passed === res.data.total) {
-        setScore((prev) => prev + 1);
-      }
+      setFinished(true);
 
     } catch (err) {
+      alert("Evaluation failed");
       console.error(err);
     }
   };
 
-  // ---------------------------------
-  // Go To Next Question (Manual)
-  // ---------------------------------
-  const nextQuestion = () => {
-    if (currentIndex + 1 < questions.length) {
-      const nextIndex = currentIndex + 1;
-      setCurrentIndex(nextIndex);
-      setResult(null);
-      setCustomInput("");
+  // ================= START SCREEN =================
+  if (!started) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 to-black text-white">
 
-      const nextQ = questions[nextIndex];
-      setUserCode(
-        language === "python"
-          ? nextQ.python_starter
-          : nextQ.java_starter
-      );
-    } else {
-      setFinished(true);
-    }
-  };
+        <div className="bg-gray-800 p-10 rounded-2xl w-[500px] shadow-xl">
 
-  // ---------------------------------
-  // Final Result
-  // ---------------------------------
-  if (finished) {
-  const percentage = Math.round((score / questions.length) * 100);
+          <h1 className="text-4xl font-bold mb-8 text-center">
+            💻 Coding Round
+          </h1>
 
-  let color = "text-red-400";
-  if (percentage >= 80) color = "text-green-400";
-  else if (percentage >= 50) color = "text-yellow-400";
+          <div className="mb-6">
+            <label className="block mb-2 text-gray-400">
+              Select Language
+            </label>
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              className="w-full p-3 rounded-lg text-black"
+            >
+              <option value="python">Python</option>
+              <option value="java">Java</option>
+            </select>
+          </div>
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
-      <div className="bg-gray-800 p-10 rounded-2xl shadow-lg text-center w-[400px]">
+          <div className="mb-8">
+            <label className="block mb-2 text-gray-400">
+              Difficulty Level
+            </label>
+            <select
+              value={difficulty}
+              onChange={(e) => setDifficulty(e.target.value)}
+              className="w-full p-3 rounded-lg text-black"
+            >
+              <option value="easy">Easy</option>
+              <option value="medium">Medium</option>
+              <option value="hard">Hard</option>
+            </select>
+          </div>
 
-        <h1 className="text-3xl font-bold mb-6">
-          🎯 Coding Round Completed
-        </h1>
+          <button
+            onClick={fetchQuestion}
+            className="w-full bg-blue-600 hover:bg-blue-700 p-4 rounded-xl text-lg font-semibold"
+          >
+            Start Coding Test
+          </button>
 
-        <div className={`text-6xl font-bold ${color}`}>
-          {percentage}%
         </div>
+      </div>
+    );
+  }
 
-        <p className="mt-4 text-lg">
-          Score: {score} / {questions.length}
-        </p>
+  // ================= RESULT SCREEN =================
+  if (finished) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 to-black text-white">
 
-        <div className="mt-6 flex justify-center gap-4">
+        <div className="bg-gray-800 p-10 rounded-2xl w-[700px] shadow-xl">
+
+          <h1 className="text-3xl font-bold mb-6">
+            🎯 Evaluation Result
+          </h1>
+
+          <div className="mb-4">
+            <span className="font-bold">Score:</span> {result?.score}/10
+          </div>
+
+          <div className="mb-4">
+            <span className="font-bold">Status:</span>{" "}
+            {result?.passed ? (
+              <span className="text-green-400">Correct ✅</span>
+            ) : (
+              <span className="text-red-400">Incorrect ❌</span>
+            )}
+          </div>
+
+          <div className="mb-6">
+            <h3 className="font-bold mb-2">AI Feedback:</h3>
+            <p className="whitespace-pre-line text-gray-300">
+              {result?.feedback}
+            </p>
+          </div>
+
+          {!result?.passed && (
+            <div>
+              <h3 className="font-bold mb-2">Correct Solution:</h3>
+              <pre className="bg-black p-4 rounded text-sm overflow-x-auto">
+                {result?.correct_solution}
+              </pre>
+            </div>
+          )}
 
           <button
             onClick={() => {
-              setQuestions([]);
+              setStarted(false);
               setFinished(false);
-              setScore(0);
-              setCurrentIndex(0);
+              setQuestion(null);
+              setResult(null);
             }}
-            className="bg-blue-600 px-5 py-2 rounded-lg"
+            className="mt-6 bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-xl"
           >
-            🔄 Try Again
+            🔄 Try Another Question
           </button>
 
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
-  // ---------------------------------
-  // Start Screen
-  // ---------------------------------
-if (questions.length === 0) {
+  // ================= QUESTION SCREEN =================
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white p-10">
 
-      <div className="bg-gray-800 p-10 rounded-2xl shadow-lg w-[450px]">
+      <div className="max-w-6xl mx-auto">
 
-        <h1 className="text-3xl font-bold text-center mb-8">
-          🚀 Coding Round
-        </h1>
-
-        {/* Difficulty */}
-        <div className="mb-5">
-          <label className="block mb-2 text-sm text-gray-400">
-            Select Difficulty
-          </label>
-          <select
-            value={difficulty}
-            onChange={(e) => setDifficulty(e.target.value)}
-            className="w-full p-3 rounded-lg text-black"
-          >
-            <option value="easy">Easy</option>
-            <option value="medium">Medium</option>
-            <option value="hard">Hard</option>
-          </select>
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-3xl font-bold">
+            {question?.title}
+          </h2>
+          <div className="text-red-400 text-xl font-bold">
+            ⏱ {timeLeft}s
+          </div>
         </div>
 
-        {/* Question Count */}
-        <div className="mb-5">
-          <label className="block mb-2 text-sm text-gray-400">
-            Number of Questions
-          </label>
-          <select
-            value={count}
-            onChange={(e) => setCount(Number(e.target.value))}
-            className="w-full p-3 rounded-lg text-black"
-          >
-            <option value={1}>1 Question</option>
-            <option value={3}>3 Questions</option>
-            <option value={5}>5 Questions</option>
-          </select>
-        </div>
+        <div className="grid md:grid-cols-2 gap-8">
 
-        {/* Language */}
-        <div className="mb-8">
-          <label className="block mb-2 text-sm text-gray-400">
-            Select Language
-          </label>
-          <select
-            value={language}
-            onChange={(e) => setLanguage(e.target.value)}
-            className="w-full p-3 rounded-lg text-black"
-          >
-            <option value="python">Python</option>
-            <option value="java">Java</option>
-          </select>
-        </div>
+          {/* LEFT SIDE - QUESTION */}
+          <div className="bg-gray-800 p-6 rounded-xl shadow">
 
-        <button
-          onClick={fetchQuestions}
-          className="w-full bg-blue-600 hover:bg-blue-700 transition p-3 rounded-lg font-semibold"
-        >
-          Start Test
-        </button>
+            <div className="mb-4">
+              <h3 className="font-bold text-blue-400 mb-1">Problem Statement</h3>
+              <p className="text-gray-300 whitespace-pre-line">
+                {question?.problem_statement}
+              </p>
+            </div>
+
+            <div className="mb-4">
+              <h3 className="font-bold text-blue-400 mb-1">Input Format</h3>
+              <p className="text-gray-300 whitespace-pre-line">
+                {question?.input_format}
+              </p>
+            </div>
+
+            <div className="mb-4">
+              <h3 className="font-bold text-blue-400 mb-1">Output Format</h3>
+              <p className="text-gray-300 whitespace-pre-line">
+                {question?.output_format}
+              </p>
+            </div>
+
+            <div className="mb-4">
+              <h3 className="font-bold text-blue-400 mb-1">Constraints</h3>
+              <p className="text-gray-300 whitespace-pre-line">
+                {question?.constraints}
+              </p>
+            </div>
+
+            <div className="mb-4">
+              <h3 className="font-bold text-green-400 mb-1">Example Input</h3>
+              <pre className="bg-black p-3 rounded text-sm">
+                {question?.example_input}
+              </pre>
+            </div>
+
+            <div>
+              <h3 className="font-bold text-green-400 mb-1">Example Output</h3>
+              <pre className="bg-black p-3 rounded text-sm">
+                {question?.example_output}
+              </pre>
+            </div>
+
+          </div>
+
+          {/* RIGHT SIDE - CODE EDITOR */}
+          <div className="bg-gray-800 p-6 rounded-xl shadow">
+
+            <h3 className="font-bold text-purple-400 mb-3">
+              Write Your Code
+            </h3>
+
+            <textarea
+              className="w-full h-96 p-4 rounded-lg text-black mb-4"
+              value={userCode}
+              onChange={(e) => setUserCode(e.target.value)}
+              placeholder="Write your solution here..."
+            />
+
+            <button
+              onClick={submitCode}
+              className="bg-green-600 hover:bg-green-700 px-6 py-3 rounded-xl w-full"
+            >
+              Submit Code
+            </button>
+
+          </div>
+
+        </div>
 
       </div>
     </div>
   );
-}
-
-// ---------------------------------
-// Question Screen
-// ---------------------------------
-const currentQuestion = questions[currentIndex];
-
-return (
-  <div className="min-h-screen bg-gray-900 text-white p-8">
-
-    <div className="max-w-4xl mx-auto">
-
-      <h2 className="text-xl mb-4">
-        Question {currentIndex + 1} of {questions.length}
-      </h2>
-
-      <div className="bg-gray-800 p-6 rounded-xl shadow">
-
-        <h3 className="text-2xl font-bold mb-3">
-          {currentQuestion.title}
-        </h3>
-
-        <p className="text-gray-300 whitespace-pre-line mb-6">
-          {currentQuestion.description}
-        </p>
-
-        {/* Code Editor */}
-        <textarea
-          className="w-full h-64 p-4 rounded-lg text-black mb-4"
-          value={userCode}
-          onChange={(e) => setUserCode(e.target.value)}
-        />
-
-        {/* Custom Input */}
-        <input
-          type="text"
-          placeholder="Optional: Custom Input"
-          className="w-full p-3 rounded-lg text-black mb-4"
-          value={customInput}
-          onChange={(e) => setCustomInput(e.target.value)}
-        />
-
-        <div className="flex gap-4">
-          <button
-            onClick={submitCode}
-            className="bg-green-600 px-6 py-2 rounded-lg"
-          >
-            Submit Code
-          </button>
-
-          {result && (
-            <button
-              onClick={nextQuestion}
-              className="bg-blue-600 px-6 py-2 rounded-lg"
-            >
-              Next Question
-            </button>
-          )}
-        </div>
-
-        {/* Result Section */}
-        {result && (
-          <div className="mt-6 bg-gray-700 p-4 rounded-lg">
-            <p>
-              Passed: {result.passed} / {result.total}
-            </p>
-
-            {result.failed_cases &&
-              result.failed_cases.map((f, index) => (
-                <div key={index} className="mt-3 text-sm">
-                  <p>Input: {JSON.stringify(f.input)}</p>
-                  <p>Expected: {JSON.stringify(f.expected)}</p>
-                  <p>Your Output: {JSON.stringify(f.your_output)}</p>
-                </div>
-              ))}
-
-            {result.correct_solution && (
-              <div className="mt-4">
-                <h4 className="font-bold">Correct Solution:</h4>
-                <pre className="bg-black p-3 rounded text-sm overflow-x-auto">
-                  {result.correct_solution}
-                </pre>
-              </div>
-            )}
-          </div>
-        )}
-
-      </div>
-    </div>
-  </div>
-);
 }

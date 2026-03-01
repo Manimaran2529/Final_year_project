@@ -5,9 +5,12 @@ import { motion } from "framer-motion";
 export default function TechnicalRound() {
   const [domains, setDomains] = useState([]);
   const [selectedDomain, setSelectedDomain] = useState("");
-  const [question, setQuestion] = useState("");
-  const [answer, setAnswer] = useState("");
-  const [result, setResult] = useState("");
+  const [count, setCount] = useState(3);
+
+  const [questions, setQuestions] = useState([]);
+  const [userAnswers, setUserAnswers] = useState([]);
+  const [result, setResult] = useState(null);
+
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -19,59 +22,76 @@ export default function TechnicalRound() {
     setDomains(res.data.domains);
   };
 
-  const getQuestion = async () => {
+  // ==========================
+  // Generate Questions
+  // ==========================
+  const generateQuestions = async () => {
     if (!selectedDomain) return alert("Please select domain");
-    setLoading(true);
-    setResult("");
-    setAnswer("");
 
-    const res = await axios.get(
-      `http://127.0.0.1:8000/technical/question/${selectedDomain}`
+    setLoading(true);
+    setResult(null);
+
+    const res = await axios.post(
+      "http://127.0.0.1:8000/technical/generate",
+      {
+        domain: selectedDomain,
+        count: count
+      }
     );
 
-    setQuestion(res.data.question);
+    setQuestions(res.data.questions);
+    setUserAnswers(new Array(res.data.questions.length).fill(""));
     setLoading(false);
   };
 
-  const submitAnswer = async () => {
-    if (!answer) return alert("Please enter your answer");
+  // ==========================
+  // Handle Answer Change
+  // ==========================
+  const handleAnswerChange = (index, value) => {
+    const updated = [...userAnswers];
+    updated[index] = value;
+    setUserAnswers(updated);
+  };
+
+  // ==========================
+  // Submit All Answers
+  // ==========================
+  const submitAnswers = async () => {
+    if (userAnswers.includes(""))
+      return alert("Please answer all questions");
 
     setLoading(true);
 
     const res = await axios.post(
-      "http://127.0.0.1:8000/technical/evaluate",
+      "http://127.0.0.1:8000/technical/submit",
       {
-        domain: selectedDomain,
-        question: question,
-        user_answer: answer
+        questions: questions,
+        user_answers: userAnswers
       }
     );
 
-    setResult(res.data.evaluation);
+    setResult(res.data);
     setLoading(false);
   };
 
   return (
     <div className="flex justify-center items-center min-h-[80vh] text-white">
-
       <motion.div
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="w-full max-w-4xl bg-gradient-to-br from-gray-800/60 to-gray-900/80 backdrop-blur-xl p-12 rounded-3xl shadow-2xl border border-white/10"
+        className="w-full max-w-5xl bg-gradient-to-br from-gray-800/60 to-gray-900/80 backdrop-blur-xl p-12 rounded-3xl shadow-2xl border border-white/10"
       >
-        {/* Title */}
         <h1 className="text-4xl font-bold text-center mb-10 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
           Technical Interview Round
         </h1>
 
-        {/* Domain Section */}
-        <div className="flex flex-col md:flex-row gap-4 justify-center items-center mb-8">
+        {/* Domain + Count */}
+        <div className="flex flex-wrap gap-4 justify-center mb-8">
 
           <select
             value={selectedDomain}
             onChange={(e) => setSelectedDomain(e.target.value)}
-            className="bg-gray-700 text-white px-6 py-3 rounded-xl border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+            className="bg-gray-700 px-6 py-3 rounded-xl"
           >
             <option value="">Select Domain</option>
             {domains.map((d, i) => (
@@ -79,57 +99,93 @@ export default function TechnicalRound() {
             ))}
           </select>
 
-          <button
-            onClick={getQuestion}
-            className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-3 rounded-xl font-semibold hover:scale-105 transition shadow-lg"
+          <select
+            value={count}
+            onChange={(e) => setCount(Number(e.target.value))}
+            className="bg-gray-700 px-6 py-3 rounded-xl"
           >
-            {loading ? "Loading..." : "Get Question"}
+            <option value={3}>3 Questions</option>
+            <option value={5}>5 Questions</option>
+            <option value={10}>10 Questions</option>
+          </select>
+
+          <button
+            onClick={generateQuestions}
+            className="bg-blue-600 px-6 py-3 rounded-xl font-semibold hover:scale-105 transition"
+          >
+            {loading ? "Generating..." : "Start Interview"}
           </button>
         </div>
 
-        {/* Question Section */}
-        {question && (
-          <div className="mt-6">
+        {/* Questions */}
+        {questions.length > 0 && !result && (
+          <div className="space-y-6">
+            {questions.map((q, index) => (
+              <div key={index} className="bg-gray-800 p-6 rounded-xl">
+                <h2 className="text-lg font-semibold mb-4">
+                  Q{index + 1}. {q.question}
+                </h2>
 
-            <div className="bg-gray-800 p-6 rounded-xl border border-white/10 mb-6">
-              <h2 className="text-xl font-semibold text-blue-400 mb-2">
-                Interview Question
-              </h2>
-              <p className="text-gray-300">{question}</p>
-            </div>
+                {q.options.map((opt, i) => (
+                  <label key={i} className="block mb-2">
+                    <input
+                      type="radio"
+                      name={`question-${index}`}
+                      value={opt}
+                      checked={userAnswers[index] === opt}
+                      onChange={() => handleAnswerChange(index, opt)}
+                      className="mr-2"
+                    />
+                    {opt}
+                  </label>
+                ))}
+              </div>
+            ))}
 
-            <textarea
-              className="w-full bg-gray-900 border border-gray-700 rounded-xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-              rows="5"
-              placeholder="Write your answer here..."
-              value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
-            />
-
-            <div className="flex justify-center mt-6">
+            <div className="text-center mt-6">
               <button
-                onClick={submitAnswer}
-                className="bg-gradient-to-r from-green-500 to-green-600 px-6 py-3 rounded-xl font-semibold hover:scale-105 transition shadow-lg"
+                onClick={submitAnswers}
+                className="bg-green-600 px-8 py-3 rounded-xl font-semibold hover:scale-105 transition"
               >
-                {loading ? "Evaluating..." : "Submit Answer"}
+                {loading ? "Evaluating..." : "Submit Answers"}
               </button>
             </div>
-
           </div>
         )}
 
-        {/* Result Section */}
+        {/* Results */}
         {result && (
-          <div className="mt-8 bg-gray-800 p-6 rounded-xl border border-purple-500 whitespace-pre-line">
-            <h3 className="text-lg font-semibold text-purple-400 mb-2">
-              AI Evaluation
-            </h3>
-            <p className="text-gray-300">{result}</p>
+          <div className="mt-10 space-y-6">
+            <h2 className="text-2xl font-bold text-center">
+              Your Score: {result.score} / {result.total_questions}
+            </h2>
+
+            {result.results.map((r, i) => (
+              <div key={i} className={`p-6 rounded-xl ${
+                r.is_correct ? "bg-green-800/40" : "bg-red-800/40"
+              }`}>
+                <p className="font-semibold mb-2">
+                  Q{i + 1}. {r.question}
+                </p>
+
+                <p>Your Answer: {r.your_answer}</p>
+
+                {!r.is_correct && (
+                  <>
+                    <p className="text-green-400">
+                      Correct Answer: {r.correct_answer}
+                    </p>
+                    <p className="text-gray-300 mt-2">
+                      Explanation: {r.explanation}
+                    </p>
+                  </>
+                )}
+              </div>
+            ))}
           </div>
         )}
 
       </motion.div>
-
     </div>
   );
 }

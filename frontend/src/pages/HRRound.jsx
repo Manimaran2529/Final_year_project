@@ -5,25 +5,25 @@ export default function HrRound() {
 
   const [recording, setRecording] = useState(false);
   const [videoBlob, setVideoBlob] = useState(null);
-  const [feedback, setFeedback] = useState("");
+  const [analysis, setAnalysis] = useState(null);
+  const [transcript, setTranscript] = useState("");
   const [question, setQuestion] = useState("");
+  const [timer, setTimer] = useState(0);
 
   const mediaRecorderRef = useRef(null);
   const videoRef = useRef(null);
   const streamRef = useRef(null);
+  const timerRef = useRef(null);
 
-  // 🔥 Fetch HR Question from backend
   useEffect(() => {
     fetchQuestion();
   }, []);
 
   const fetchQuestion = async () => {
-    try {
-      const res = await axios.get("http://127.0.0.1:8000/hr-question");
-      setQuestion(res.data.question);
-    } catch (err) {
-      console.error(err);
-    }
+    const res = await axios.get("http://127.0.0.1:8000/hr-question");
+    setQuestion(res.data.question);
+    setAnalysis(null);
+    setTranscript("");
   };
 
   const startRecording = async () => {
@@ -42,83 +42,81 @@ export default function HrRound() {
       let chunks = [];
 
       recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunks.push(e.data);
-        }
+        if (e.data.size > 0) chunks.push(e.data);
       };
 
       recorder.onstop = () => {
         const blob = new Blob(chunks, { type: "video/webm" });
         setVideoBlob(blob);
-
         streamRef.current.getTracks().forEach(track => track.stop());
+        clearInterval(timerRef.current);
       };
 
       recorder.start();
       setRecording(true);
+      setTimer(0);
 
-    } catch (error) {
-      alert("Camera or microphone permission denied");
+      timerRef.current = setInterval(() => {
+        setTimer(prev => prev + 1);
+      }, 1000);
+
+    } catch {
+      alert("Camera permission denied");
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.stop();
-      setRecording(false);
-    }
+    mediaRecorderRef.current.stop();
+    setRecording(false);
   };
 
   const submitAnswer = async () => {
 
     if (!videoBlob) {
-      alert("Please record your answer first!");
+      alert("Please record first");
       return;
     }
 
     const formData = new FormData();
-    formData.append("audio", videoBlob, "answer.webm"); // 🔥 must match backend
+    formData.append("video", videoBlob, "answer.webm");
 
-    try {
-      const res = await axios.post(
-        "http://127.0.0.1:8000/hr-evaluate",
-        formData
-      );
+    const res = await axios.post(
+      "http://127.0.0.1:8000/hr-evaluate",
+      formData
+    );
 
-      setFeedback(res.data.feedback);
-
-    } catch (err) {
-      console.error(err);
-      alert("Upload failed");
-    }
+    setTranscript(res.data.transcript);
+    setAnalysis(res.data.analysis);
   };
 
   return (
     <div className="p-10 text-white bg-gray-900 min-h-screen">
 
-      <h1 className="text-3xl mb-6">HR Interview Practice</h1>
+      <h1 className="text-3xl mb-6">AI HR Interview Practice</h1>
 
-      {/* 🔥 Show Question */}
+      {/* Question */}
       <div className="mb-6 bg-gray-800 p-4 rounded">
         <h2 className="text-xl font-semibold">Question:</h2>
         <p className="mt-2">{question}</p>
       </div>
 
-      {/* 🔥 Video Preview */}
+      {/* Video */}
       <video
         ref={videoRef}
         autoPlay
         muted
-        className="mb-6 w-96 rounded-lg border"
+        className="mb-4 w-96 rounded-lg border"
       />
 
-      <div className="flex gap-4">
+      <p className="mb-4">Recording Time: {timer}s</p>
+
+      <div className="flex gap-4 mb-6">
         <button
           onClick={startRecording}
           disabled={recording}
           className="bg-green-600 px-4 py-2 rounded"
         >
-          Start Recording
+          Start
         </button>
 
         <button
@@ -126,7 +124,7 @@ export default function HrRound() {
           disabled={!recording}
           className="bg-red-600 px-4 py-2 rounded"
         >
-          Stop Recording
+          Stop
         </button>
 
         <button
@@ -135,13 +133,30 @@ export default function HrRound() {
         >
           Submit
         </button>
+
+        <button
+          onClick={fetchQuestion}
+          className="bg-purple-600 px-4 py-2 rounded"
+        >
+          New Question
+        </button>
       </div>
 
-      {/* 🔥 AI Feedback */}
-      {feedback && (
-        <div className="mt-6 bg-gray-800 p-4 rounded">
-          <h3 className="font-bold">AI Feedback</h3>
-          <p className="mt-2 whitespace-pre-line">{feedback}</p>
+      {/* Transcript */}
+      {transcript && (
+        <div className="bg-gray-800 p-4 rounded mb-6">
+          <h3 className="font-bold">Transcript</h3>
+          <p className="mt-2">{transcript}</p>
+        </div>
+      )}
+
+      {/* Analysis */}
+      {analysis && (
+        <div className="bg-gray-800 p-6 rounded">
+          <h3 className="text-xl font-bold mb-4">AI Evaluation</h3>
+          <pre className="whitespace-pre-wrap">
+            {JSON.stringify(analysis, null, 2)}
+          </pre>
         </div>
       )}
 

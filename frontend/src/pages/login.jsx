@@ -9,6 +9,9 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  // ======================
+  // Manual Login
+  // ======================
   const handleLogin = async () => {
     try {
       const res = await axios.post(
@@ -16,17 +19,24 @@ export default function Login() {
         { email, password }
       );
 
+      console.log("Login Response:", res.data);
+
       localStorage.setItem("token", res.data.access_token);
       localStorage.setItem("user_email", res.data.email);
       localStorage.setItem("user_name", res.data.name);
+      localStorage.setItem("user_id", res.data.id); // ✅ IMPORTANT
 
       navigate("/dashboard");
 
     } catch (err) {
+      console.error(err);
       alert("Invalid credentials");
     }
   };
 
+  // ======================
+  // Google Login
+  // ======================
   const handleGoogleSuccess = async (credentialResponse) => {
     try {
       const res = await axios.post(
@@ -34,20 +44,23 @@ export default function Login() {
         { token: credentialResponse.credential }
       );
 
+      console.log("Google Login Response:", res.data);
+
       localStorage.setItem("token", res.data.access_token);
       localStorage.setItem("user_email", res.data.email);
       localStorage.setItem("user_name", res.data.name);
+      localStorage.setItem("user_id", res.data.id); // ✅ THIS WAS MISSING
 
       navigate("/dashboard");
 
     } catch (err) {
+      console.error(err);
       alert("Google login failed");
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-black text-white">
-
       <div className="bg-white/5 p-10 rounded-3xl w-96 space-y-6 shadow-2xl">
 
         <h1 className="text-3xl font-bold text-center">
@@ -84,7 +97,6 @@ export default function Login() {
           onError={() => alert("Google Login Failed")}
         />
 
-        {/* ✅ SIGN UP LINK */}
         <p className="text-center mt-4 text-sm">
           Don't have an account?{" "}
           <span

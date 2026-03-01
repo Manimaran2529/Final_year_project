@@ -1,29 +1,71 @@
-from fastapi import APIRouter, Form
-from services.ai_questions import (
-    generate_technical_questions,
-    generate_daily_math_questions
-)
+from fastapi import APIRouter
+from pydantic import BaseModel
+from services.ai_questions import generate_technical_questions
 
 router = APIRouter()
 
-# ====================================
-# AI DAILY MATH PRACTICE
-# ====================================
+# ==============================
+# REQUEST MODELS
+# ==============================
 
-@router.get("/ai-daily-math/{level}/{count}")
-def ai_daily_math(level: str, count: int):
-    questions = generate_daily_math_questions(level, count)
+class GenerateRequest(BaseModel):
+    domain: str
+    count: int
+
+class SubmitRequest(BaseModel):
+    questions: list
+    user_answers: list
+
+
+# ==============================
+# GENERATE DOMAIN QUESTIONS
+# ==============================
+
+@router.post("/technical/generate")
+def generate_questions(data: GenerateRequest):
+
+    questions = generate_technical_questions(
+        data.domain,
+        data.count
+    )
+
     return {"questions": questions}
 
 
-# ====================================
-# AI TECHNICAL QUESTIONS
-# ====================================
+# ==============================
+# SUBMIT & EVALUATE
+# ==============================
 
-@router.post("/ai-technical-questions")
-def ai_technical_questions(
-    domain: str = Form(...),
-    count: int = Form(...)
-):
-    questions = generate_technical_questions(domain, count)
-    return {"questions": questions}
+@router.post("/technical/submit")
+def evaluate_answers(data: SubmitRequest):
+
+    questions = data.questions
+    user_answers = data.user_answers
+
+    score = 0
+    results = []
+
+    for i in range(len(questions)):
+
+        correct_answer = questions[i]["answer"]
+        user_answer = user_answers[i]
+
+        is_correct = user_answer == correct_answer
+
+        if is_correct:
+            score += 1
+
+        results.append({
+            "question": questions[i]["question"],
+            "options": questions[i]["options"],
+            "your_answer": user_answer,
+            "correct_answer": correct_answer,
+            "explanation": questions[i]["explanation"],
+            "is_correct": is_correct
+        })
+
+    return {
+        "total_questions": len(questions),
+        "score": score,
+        "results": results
+    }
